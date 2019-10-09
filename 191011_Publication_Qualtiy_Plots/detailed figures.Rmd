@@ -1,0 +1,211 @@
+---
+title: "Detailed figures"
+author: "C. E. Timothy Paine"
+date: "11/10/2019"
+output: pdf_document
+---
+## SETUP the working environment
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(lme4)
+library(visreg)
+library(doSNOW)
+
+# define a useful function
+inv.logit <- function(x){exp(x)/(1+exp(x))}
+
+```
+
+## Generate fake data
+Use `expand.grid()` to generate all possible combinations of the supplied argument. 
+
+```{r make data, tidy = T}
+datl <- expand.grid(
+  time = c(10, 30, 100, 200, 400, 600), 
+  light = c('Shade', 'Bright'), 
+  trt = 1:3)
+datl$response <- rnorm(36, 0.5, 0.1)
+datl$Xpos <- jitter(datl$time)
+```
+
+## Figure 1. A scatterplot
+Here we demonstrate a variety of techniques to annotate plots. 
+We: 
+  1 -- use plotmath to make detailed Y-axis label
+  2 -- use `jitter()` to plot the horizontal position of the points, so that they do not all overlap
+  3 -- use a loop to plot the line for each treatment group seperately, using a variety of line types and colours. 
+    Note that this figure lacks a legend indicating the meaning of the different line types. 
+  4 -- annotate the figure with a legend and a statement of statistical significance
+
+```{r Figure 1, tidy = T}
+par(mar = c(5, 6, 1, 1), las = 1, bty = 'n', tcl = 0.2, mgp = c(2, 0.5, 0))
+plot(response ~ Xpos, data = datl, col = light, type = 'p', ylim = c(0.2, 0.9), xlab = 'Time (days)', ylab = expression(Substrate~derived~CO[2]~(mu~mol%.%m^-2%.%s^-1)))
+for(i in 1:3){
+    datl.shade.i <- datl[datl$trt == i & datl$light == 'Shade',]
+    datl.bright.i <- datl[datl$trt == i & datl$light == 'Bright',]
+
+    lines(response ~ Xpos, data = datl.bright.i, lty = i, col = 2)
+    lines(response ~ Xpos, data = datl.shade.i,  lty = i, col = 1)
+    segments(datl.bright.i$Xpos, datl.bright.i$response - 0.1, datl.bright.i$Xpos, datl.bright.i$response + 0.1, col = 2)
+    segments(datl.shade.i$Xpos, datl.shade.i$response - 0.1, datl.shade.i$Xpos, datl.shade.i$response + 0.1, col = 1)
+}
+legend(420, 0.9, pch = 1, col = 1:2, c("Shade", 'Bright'), lty = 1, title = 'Light availability')
+text(225, 0.9, "P = 0.08 ***")
+mtext("A)", line = -1, adj = 0.05, font = 2)
+```
+
+## Figure 2. Another scatterplot
+Here we make a similar figure, but do it using two panels, one for each light treatment. First we make new objects for the data from the 'Bright' light treatment and the 'Shade' light treatment.
+
+```{r Figure 2, tidy = T}
+
+datl.shade <- datl[datl$light == 'Shade',]
+datl.bright <- datl[datl$light == 'Bright',]
+
+par(mar = c(1, 5, 1, 1), oma = c(4, 0, 0, 0), las = 1, bty = 'n', tcl = 0.2, mgp = c(2, 0.5, 0), mfrow = c(2, 1), xpd = NA)
+# Panel A
+plot(response ~ Xpos, data = datl.shade, type = 'p', ylim = c(0.2, 0.9), ylab = "", xlab = '', xaxt = 'n')
+axis(1, labels = NA)
+for(i in 1:3){
+    datl.shade.i <- datl.shade[datl.shade$trt == i,]
+    lines(response ~ Xpos, data = datl.shade.i, col = 1, lty = i)
+    segments(datl.shade.i$Xpos, datl.shade.i$response - 0.1, datl.shade.i$Xpos, datl.shade.i$response + 0.1, col = 1)
+}
+mtext("A) Shade", line = -1, adj = 0.05, font = 2)
+
+# Panel B
+plot(response ~ Xpos, data = datl.bright, type = 'p', ylim = c(0.2, 0.9), ylab = "", col = 2,  xlab = 'Time (days)')
+for(i in 1:3){
+    datl.bright.i <- datl.bright[datl.bright$trt == i,]
+    lines(response ~ Xpos, data = datl.bright.i, col = 2, lty = i)
+    segments(datl.bright.i$Xpos, datl.bright.i$response - 0.1, datl.bright.i$Xpos, datl.bright.i$response + 0.1, col = 2)
+}
+mtext("B) Bright", line = -1, adj = 0.05, font = 2)
+
+title(ylab = expression(Substrate~derived~CO[2]~(mu~mol%.%m^-2%.%s^-1)), outer = T, line = -2)
+
+legend(220, 0.9, pch = 1, lty  = 1:3, c(1:3), ncol = 3, cex = 0.7, title = 'Treatment', seg.len = 4)
+```
+
+## Figure 3. Barplots
+Here we demonstrate how barplots can be patterned in ways that make your treatments distinctive, without needing to use colour. Note that `barplot()` is often wasteful of ink, and that dotplots are generally preferred. Even so, many people like barplots. Panel A distinguishes the bars using colour. Panel B uses different styles of cross hatching. B is especially nice for two interacting factors, in which one set of hatching indicates the level of the first factor, and the other represents the level of the second factor. 
+```{r barplot, tidy = T}
+tN <- table(Ni <- stats::rpois(100, lambda = 5)) # this is our fake data
+tN <- tN[1:6] # just use the first six bars
+sd <- runif(6, 1, 4)
+
+par(mfrow = c(2, 1), mar = c(1, 5, 1, 1), oma = c(4, 0, 0, 0), las = 1, bty = 'n', tcl = 0.2, mgp = c(2, 0.5, 0))
+r <- barplot(tN, col = rainbow(6), main = 'Use colour')
+segments(r, tN-sd, r, tN+sd)
+mtext("A)", line = -1, adj = 0.05, font = 2)
+
+r <- barplot(tN,  density = c(0, 10, 20, 0, 10, 20), angle = 45, main = 'Use hatching')
+r <- barplot(tN,  density = c(0, 0, 0, 20, 20, 20), angle = -45, add = T)
+segments(r, tN-sd, r, tN+sd)
+mtext("B)", line = -1, adj = 0.05, font = 2)
+
+```
+
+## Figure 4. Dotplots
+Here we demonstrate how to present the same data as appears in barplots more elegantly. They can be patterned in ways that make your treatments distinctive, with or without colour. Panel A distinguishes the treatments using colour. Panel B uses different point styles. B is especially nice for interacting factors. 
+```{r dotplot, tidy = T}
+tN <- table(Ni <- stats::rpois(100, lambda = 5)) # this is our fake data
+tN <- as.numeric(tN[1:6]) # just use the first six bars
+Xpos <- c(-0.1, 0.1) + rep(1:3, each = 2)
+sd <- runif(6)
+
+par(mfrow = c(2, 1), mar = c(1, 5, 1, 1), oma = c(4, 0, 0, 0), las = 1, bty = 'n', tcl = 0.2, mgp = c(2, 0.5, 0))
+
+plot(tN, Xpos, pch = 16, col = c('red', 'blue'), cex = 2, xlim = range(tN-sd, tN+sd), ylim = c(0, 4), yaxt = "n")
+axis(2, at = 1:3)
+abline(h = 1:3, col = 'gray', lty = 3)
+segments(tN-sd, Xpos, tN+sd, Xpos, lwd = 2)
+mtext("A)", line = -1, adj = 0.05, font = 2)
+
+plot(tN, Xpos, pch = 1:2, cex = 2, xlim = range(tN-sd, tN+sd), ylim = c(0, 4), yaxt = "n")
+axis(2, at = 1:3)
+abline(h = 1:3, col = 'gray', lty = 3)
+segments(tN-sd, Xpos, tN+sd, Xpos, lwd = 2)
+mtext("B)", line = -1, adj = 0.05, font = 2)
+
+```
+
+
+
+
+
+
+## Figure 5. Logistic regression with visreg
+Here we demonstrate how we can use visreg to produce quick plots, even from complicated models. 
+```{r visreg, tidy = T}
+
+data("birthwt",package="MASS")
+birthwt$race  <- factor(birthwt$race,labels=c("White","Black","Other"))
+birthwt$smoke <- factor(birthwt$smoke,labels=c("Nonsmoker","Smoker"))
+fit <- glm(low~age+race+smoke+lwt,data=birthwt,family="binomial")
+visreg(fit,"lwt",xlab="Mother's Weight",ylab="Log odds (low birthweight)", rug = T, partial = F)
+visreg(fit, "lwt", scale="response", partial=FALSE, xlab="Mother's Weight", ylab="P(low birthweight)")
+```
+
+#### Figure 6. Generalised mixed effect model with visreg
+Here we demonstrate how we can use visreg to produce quick plots, even from complicated models. But visreg cannot handle confidence intervals around predictions from  mixed-effect models.
+
+```{r visreg_glmer, tidy = T}
+dat4 <- read.csv("dat4.csv")
+
+glmerR  <- glmer(Rejection ~  n.citations.l + JIF.start.l + (1|Year.end.f), family = 'binomial', data = dat4)
+anova(glmerR)
+summary(glmerR)
+
+#### Plot up the results of the analysis using Visreg ####
+visreg(glmerR, xvar = 'n.citations.l') # this is non-sensical, since no one can interpret the Y axis
+visreg(glmerR, xvar = 'n.citations.l', scale = 'response') # this is at least interpretable, though not pretty
+visreg(glmerR, xvar = 'n.citations.l', by = "JIF.start.l", breaks = c(0.1, 1), scale = 'response', band = T, overlay = T, xaxt = 'n') # this is better decorated, but what's on the X axis?
+axis(1, at = seq(0, 2.5, by = 0.5), labels = 10^(seq(0, 2.5, by = 0.5))) #this just looks silly!
+axis(1, at = log10(c(1, 5, 10, 20, 50, 100, 300)), labels = c(1, 5, 10, 20, 50, 100, 300)) #this  looks better!
+# visreg is great, but notice tht it does not easily produce confidence intervals around predictions. 
+```
+
+
+#### Figure 7. Generalised mixed effect model with basic plot and parametric bootstrapping
+Here we demonstrate how to use parametric bootsttrapping to generate confidence intervals around the predictions from mixed-effect models. Then we use base `plot()` to plot them up. Here are the steps:
+  1 -- We create new data to generte predictions, using `expand.grid()`. 
+  2 -- We make a prediction from the model, using `predict()`, to get the mean prediction.
+  3 -- We use parametric bootstrapping, with `bootMer()` to make a family of predictions, then use `quantile()` to get the 95% confidence intervals around that set of predictions. 
+  4 -- We then use `plot()` to actually make the figure. 
+
+
+```{r plot_glmer, tidy = T}
+
+nd <- expand.grid(
+  n.citations.l = seq(min(dat4$n.citations.l), max(dat4$n.citations.l), length = 11),
+  JIF.start.l = median(dat4$JIF.start.l, na.rm = T))
+nd$predR <- inv.logit(predict(glmerR, newdata = nd, re.form = NA))
+boot.glmerR   <- data.frame(bootMer(glmerR, FUN = function(x){
+  inv.logit(predict(x, newdata = nd, re.form = NA))
+  }, nsim = 10, verbose = T)) #note that this only makes 10 bootstrap replicates, 100 (or 1000) is better, but takes a while to do. Running this function in parallel can be MUCH faster. 
+nd$CIR <- t(apply(boot.glmerR, 2, quantile, c(0.025, 0.975)))
+
+par(mfrow = c(1, 1), las = 1, bty = 'n', tcl = 0.2, mar  = c(4, 4, 1, 1), lend = 1)
+
+plot(predR ~ n.citations.l, data = nd, type = 'l', ylim = c(0, 0.4), xlim = c(0, 3),  lwd = 3, ylab = 'Probability of rejection', xaxt = 'n', xlab = 'Number of citations obtained')
+axis(1, at = 0:3, labels = 10^(0:3))
+polygon(c(nd$n.citations.l, rev(nd$n.citations.l)), c(nd$CIR[,1], rev(nd$CIR[,2])), col = '#00000030', border = NA)
+
+years <- sort(unique(dat4$Year.end.f))
+for(i in 1:length(years)){
+    dat4.i <- dat4[dat4$Year.end.f == years[i],]
+    nd.i <- expand.grid(
+      n.citations.l = seq(min(dat4.i$n.citations.l), max(dat4.i$n.citations.l), length = 11), 
+      Year.end.f   = years[i], 
+      JIF.start.l  = median(dat4.i$JIF.start.l, na.rm = T))
+    nd.i$pred <- inv.logit(predict(glmerR, newdata = nd.i))
+    lines(pred ~ n.citations.l, data = nd.i, type = 'l', col = i)
+}
+legend('topright', title = 'Year', legend = years, col = 1:length(years), lwd = 1)
+mtext("Figure 1", adj = 0.05, line = -1,  outer = T, family = 'Times')
+
+```
+
+
